@@ -46,64 +46,14 @@ const addCompanyForm = document.getElementById("addCompanyForm");
 const editCompanyForm = document.getElementById("editCompanyForm");
 
 // ------------------------
-// Replace Admin inputs with dropdowns
-// ------------------------
-const addAdminInput = addCompanyForm.querySelector('input[name="adminID"]');
-const editAdminInput = editCompanyForm.querySelector('input[name="adminID"]');
-
-const addAdminSelect = document.createElement("select");
-addAdminSelect.name = "adminID";
-addAdminSelect.className = "w-full border px-3 py-2 rounded";
-addAdminSelect.required = true;
-
-const editAdminSelect = document.createElement("select");
-editAdminSelect.name = "adminID";
-editAdminSelect.className = "w-full border px-3 py-2 rounded";
-editAdminSelect.required = true;
-
-addAdminInput.replaceWith(addAdminSelect);
-editAdminInput.replaceWith(editAdminSelect);
-
-// ------------------------
-// Load admins into dropdown (only same company, role: company_admin)
-// ------------------------
-async function loadAdmins() {
-  addAdminSelect.innerHTML = '<option value="">Select Company Admin</option>';
-  editAdminSelect.innerHTML = '<option value="">Select Company Admin</option>';
-
-  const usersSnap = await getDocs(collection(db, "users"));
-  usersSnap.forEach(docSnap => {
-    const user = docSnap.data();
-    // Only company admins, not super admins
-    if (user.role === "company_admin" && user.companyID === loggedInUser.companyID) {
-      const option = document.createElement("option");
-      option.value = docSnap.id;
-      option.textContent = user.fullName || user.username || "(No name)";
-      addAdminSelect.appendChild(option);
-      editAdminSelect.appendChild(option.cloneNode(true));
-    }
-  });
-}
-
-// ------------------------
-// Load companies (filter by user's company if not super_admin)
+// Load companies
 // ------------------------
 async function loadCompanies() {
   loading.classList.remove("hidden");
   companiesContainer.classList.add("hidden");
   companiesTable.innerHTML = "";
 
-  const [companiesSnapshot, usersSnapshot] = await Promise.all([
-    getDocs(collection(db, "companies")),
-    getDocs(collection(db, "users")),
-  ]);
-
-  // Map user IDs to names
-  const userMap = {};
-  usersSnapshot.forEach((u) => {
-    const user = u.data();
-    userMap[u.id] = user.fullName || "Unnamed User";
-  });
+  const companiesSnapshot = await getDocs(collection(db, "companies"));
 
   companiesSnapshot.forEach((docSnap) => {
     const company = docSnap.data();
@@ -114,13 +64,13 @@ async function loadCompanies() {
     const createdDate = company.createdAt?.toDate
       ? company.createdAt.toDate().toLocaleString()
       : "N/A";
+
     const tr = document.createElement("tr");
     tr.className = "border-b hover:bg-gray-50";
     tr.innerHTML = `
       <td class="px-4 py-2">${company.name || ""}</td>
       <td class="px-4 py-2">${company.address || ""}</td>
       <td class="px-4 py-2">${company.contactEmail || ""}</td>
-      <td class="px-4 py-2">${userMap[company.adminID] || "Not Assigned"}</td>
       <td class="px-4 py-2">${(company.roles || []).join(", ")}</td>
       <td class="px-4 py-2">${createdDate}</td>
       <td class="px-4 py-2 text-center space-x-2">
@@ -133,8 +83,7 @@ async function loadCompanies() {
 
   // Edit button
   document.querySelectorAll(".edit-btn").forEach((btn) => {
-    btn.addEventListener("click", async (e) => {
-      await loadAdmins();
+    btn.addEventListener("click", (e) => {
       const id = e.target.dataset.id;
       const docSnap = companiesSnapshot.docs.find((d) => d.id === id);
       const companyData = docSnap.data();
@@ -143,8 +92,8 @@ async function loadCompanies() {
       editCompanyForm.name.value = companyData.name || "";
       editCompanyForm.address.value = companyData.address || "";
       editCompanyForm.contactEmail.value = companyData.contactEmail || "";
-      editAdminSelect.value = companyData.adminID || "";
       editCompanyForm.roles.value = (companyData.roles || []).join(", ");
+
       editCompanyModal.classList.remove("hidden");
     });
   });
@@ -153,15 +102,8 @@ async function loadCompanies() {
   document.querySelectorAll(".delete-btn").forEach((btn) => {
     btn.addEventListener("click", async (e) => {
       const id = e.target.dataset.id;
-      const companyDoc = await getDoc(doc(db, "companies", id));
-      const companyData = companyDoc.data();
 
       if (confirm("Are you sure you want to delete this company?")) {
-        if (companyData?.adminID) {
-          await updateDoc(doc(db, "users", companyData.adminID), {
-            companyID: "",
-          });
-        }
         await deleteDoc(doc(db, "companies", id));
         alert("Company deleted successfully!");
         await loadCompanies();
@@ -176,8 +118,7 @@ async function loadCompanies() {
 // ------------------------
 // Modal buttons
 // ------------------------
-showAddModalBtn.addEventListener("click", async () => {
-  await loadAdmins();
+showAddModalBtn.addEventListener("click", () => {
   addCompanyModal.classList.remove("hidden");
 });
 closeAddModalBtn.addEventListener("click", () => addCompanyModal.classList.add("hidden"));
@@ -196,11 +137,7 @@ addCompanyForm.addEventListener("submit", async (e) => {
 
   formData.createdAt = serverTimestamp();
 
-  const companyRef = await addDoc(collection(db, "companies"), formData);
-
-  if (formData.adminID) {
-    await updateDoc(doc(db, "users", formData.adminID), { companyID: companyRef.id });
-  }
+  await addDoc(collection(db, "companies"), formData);
 
   addCompanyForm.reset();
   addCompanyModal.classList.add("hidden");
@@ -221,18 +158,7 @@ editCompanyForm.addEventListener("submit", async (e) => {
     ? formData.roles.split(",").map(r => r.trim()).filter(r => r)
     : [];
 
-  const oldCompanyDoc = await getDoc(companyRef);
-  const oldAdminID = oldCompanyDoc.data()?.adminID;
-
   await updateDoc(companyRef, formData);
-
-  if (oldAdminID && oldAdminID !== formData.adminID) {
-    await updateDoc(doc(db, "users", oldAdminID), { companyID: "" });
-  }
-
-  if (formData.adminID) {
-    await updateDoc(doc(db, "users", formData.adminID), { companyID: id });
-  }
 
   editCompanyModal.classList.add("hidden");
   await loadCompanies();
@@ -243,6 +169,7 @@ editCompanyForm.addEventListener("submit", async (e) => {
 // ------------------------
 await loadCompanies();
 </script>
+
 
 
 
@@ -335,7 +262,6 @@ await loadCompanies();
                   <th class="px-4 py-2 text-left whitespace-nowrap">Name</th>
                   <th class="px-4 py-2 text-left whitespace-nowrap">Address</th>
                   <th class="px-4 py-2 text-left whitespace-nowrap">Contact Email</th>
-                  <th class="px-4 py-2 text-left whitespace-nowrap">Admin ID</th>
                   <th class="px-4 py-2 text-left whitespace-nowrap">Roles</th>
                   <th class="px-4 py-2 text-left whitespace-nowrap">Created At</th>
                   <th class="px-4 py-2 text-center whitespace-nowrap">Action</th>
@@ -357,9 +283,8 @@ await loadCompanies();
           <input name="name" type="text" placeholder="Company Name" class="w-full border px-3 py-2 rounded" required>
           <input name="address" type="text" placeholder="Address" class="w-full border px-3 py-2 rounded" required>
           <input name="contactEmail" type="email" placeholder="Contact Email" class="w-full border px-3 py-2 rounded" required>
-          <input name="adminID" type="text" placeholder="Admin ID" class="w-full border px-3 py-2 rounded">
           <input name="roles" type="text" placeholder="Enter roles separated by comma" class="w-full border px-3 py-2 rounded">
-            <p class="text-sm text-gray-500">Example: super_admin, company_admin, normal_user</p>
+          <p class="text-sm text-gray-500">Example: super_admin, company_admin, normal_user</p>
           <div class="flex justify-end gap-2">
             <button type="button" id="closeAddModalBtn" class="px-4 py-2 bg-gray-400 rounded text-white">Cancel</button>
             <button type="submit" class="px-4 py-2 bg-red-600 text-white rounded">Create</button>
@@ -373,10 +298,9 @@ await loadCompanies();
         <h2 class="text-xl font-semibold mb-4">Edit Company</h2>
         <form id="editCompanyForm" class="space-y-3">
           <input type="hidden" name="companyId">
-          <input name="name" type="text" placeholder="Company Name" class="w-full border px-3 py-2 rounded" required>
-          <input name="address" type="text" placeholder="Address" class="w-full border px-3 py-2 rounded" required>
-          <input name="contactEmail" type="email" placeholder="Contact Email" class="w-full border px-3 py-2 rounded" required>
-          <input name="adminID" type="text" placeholder="Admin ID" class="w-full border px-3 py-2 rounded">
+          <input name="name" type="text" placeholder="Company Name" class="w-full border px-3 py-2 rounded">
+          <input name="address" type="text" placeholder="Address" class="w-full border px-3 py-2 rounded">
+          <input name="contactEmail" type="email" placeholder="Contact Email" class="w-full border px-3 py-2 rounded">
           <input name="roles" type="text" placeholder="Roles (comma separated)" class="w-full border px-3 py-2 rounded">
           <div class="flex justify-end gap-2">
             <button type="button" id="closeEditModalBtn" class="px-4 py-2 bg-gray-400 rounded text-white">Cancel</button>
