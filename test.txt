@@ -1,0 +1,308 @@
+#include <WiFi.h>
+#include <HTTPClient.h>
+#include <Adafruit_Fingerprint.h>
+#include <HardwareSerial.h>
+#include <WiFiClientSecure.h>
+#include <Adafruit_SH110X.h> // SH110X OLED
+
+// ======================
+// CONFIGURATION
+// ======================
+const char* WIFI_SSID = "MERCUSYS";
+const char* WIFI_PASS = "Jpmonterde12";
+
+const String FIREBASE_PROJECT_ID = "lokeesmartloto";
+const String USER_COLLECTION = "users";
+
+// Solenoid config
+const int SOLENOID_PIN = 12;
+const bool SOLENOID_ACTIVE_HIGH = true;
+const unsigned long UNLOCK_DURATION_MS = 5000;
+
+// =========================
+// OLED CONFIG
+// =========================
+#define SCREEN_WIDTH 128
+#define SCREEN_HEIGHT 64
+Adafruit_SH1107 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire);
+
+// ======================
+// HARDWARE SETUP
+// ======================
+HardwareSerial mySerial(2); // UART2 for fingerprint
+Adafruit_Fingerprint finger = Adafruit_Fingerprint(&mySerial);
+
+// ======================
+// HARD-CODED SEQUENCE
+// ======================
+String sequence[3] = {"employee", "company_admin", "super_admin"};
+int currentStep = 0; // ESP32 local sequence tracker
+
+// ======================
+// FORWARD DECLARATIONS
+// ======================
+void enrollUserFlow();
+void identifyUserFlow();
+int findNextFingerprintID();
+void enrollFingerprint(int id);
+void saveFingerprintID(String userID, int fingerprintID);
+String getUserIDByFingerprint(int fid);
+String getUserRole(String userID);
+void processUserSequence(String role, String userID);
+void unlockSolenoid(unsigned long durationMs);
+void lockSolenoid();
+void oledPrint(String line1, String line2 = "");
+
+// ======================
+// SETUP
+// ======================
+void setup() {
+  Serial.begin(115200);
+  delay(1000);
+
+  pinMode(SOLENOID_PIN, OUTPUT);
+  lockSolenoid();
+
+  // OLED init
+  if (!display.begin(0x3C)) {
+    Serial.println("❌ SH110X OLED init failed");
+  } else {
+    display.clearDisplay();
+    display.setTextSize(1);
+    display.setTextColor(SH110X_WHITE);
+    display.setCursor(0, 0);
+    display.println("Booting...");
+    display.display();
+  }
+
+  // Wi-Fi init
+  Serial.println("\n[ESP32] Connecting to Wi-Fi...");
+  WiFi.begin(WIFI_SSID, WIFI_PASS);
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(400);
+    Serial.print(".");
+  }
+  Serial.println("\n✅ Wi-Fi Connected!");
+  Serial.println(WiFi.localIP());
+  oledPrint("Wi-Fi Connected", WiFi.localIP().toString());
+
+  // Fingerprint sensor init
+  mySerial.begin(57600, SERIAL_8N1, 16, 17);
+  finger.begin(57600);
+  if (finger.verifyPassword()) {
+    Serial.println("✅ Fingerprint sensor detected!");
+    oledPrint("Fingerprint Ready");
+  } else {
+    Serial.println("❌ Fingerprint sensor not found. Halting...");
+    oledPrint("Fingerprint Fail");
+    while (true) delay(1);
+  }
+}
+
+// ======================
+// MAIN LOOP (menu)
+// ======================
+void loop() {
+  Serial.println("\n==========================");
+  Serial.println("Choose an option:");
+  Serial.println("1. Enroll fingerprint");
+  Serial.println("2. Identify user (sequence lock)");
+  Serial.println("==========================");
+
+  while (!Serial.available()) delay(50);
+  char option = Serial.read();
+  Serial.read(); // consume newline
+
+  if (option == '1') enrollUserFlow();
+  else if (option == '2') identifyUserFlow();
+  else Serial.println("Invalid option.");
+
+  delay(300);
+}
+
+// ======================
+// ENROLLMENT FLOW
+// ======================
+void enrollUserFlow() {
+  Serial.println("Enter the User ID to register fingerprint:");
+  oledPrint("Enter User ID");
+  while (!Serial.available()) delay(50);
+  String userID = Serial.readStringUntil('\n');
+  userID.trim();
+
+  Serial.print("Enrolling fingerprint for User ID: "); Serial.println(userID);
+  oledPrint("Enrolling", userID);
+
+  int fid = findNextFingerprintID();
+  enrollFingerprint(fid);
+
+  if (fid > 0) {
+    Serial.println("Saving fingerprint ID to Firestore...");
+    oledPrint("Saving Fingerprint");
+    saveFingerprintID(userID, fid);
+    oledPrint("Enroll Complete", userID);
+  }
+}
+
+// ======================
+// IDENTIFICATION FLOW
+// ======================
+void identifyUserFlow() {
+  Serial.println("Place your finger to identify...");
+  oledPrint("Place Finger");
+
+  int p = -1;
+  while (p != FINGERPRINT_OK) { p = finger.getImage(); delay(100); }
+
+  p = finger.image2Tz(1);
+  if (p != FINGERPRINT_OK) { Serial.println("⚠️ Error converting image"); oledPrint("Image Error"); return; }
+
+  p = finger.fingerFastSearch();
+  if (p == FINGERPRINT_OK) {
+    int fid = finger.fingerID;
+    Serial.print("✅ Fingerprint matched! ID: "); Serial.println(fid);
+
+    String userID = getUserIDByFingerprint(fid);
+    Serial.print("Mapped to userID: "); Serial.println(userID);
+
+    if (userID == "Unknown") { Serial.println("User not found"); oledPrint("Unknown User"); return; }
+
+    String role = getUserRole(userID);
+    Serial.print("User role: "); Serial.println(role);
+
+    processUserSequence(role, userID);
+
+  } else {
+    Serial.println("❌ Fingerprint not recognized.");
+    oledPrint("Not Recognized");
+  }
+}
+
+// ======================
+// Find next fingerprint slot
+// ======================
+int findNextFingerprintID() {
+  int id = 1;
+  while (id < 128) { if (finger.loadModel(id) != FINGERPRINT_OK) break; id++; }
+  return id;
+}
+
+// ======================
+// Enroll fingerprint
+// ======================
+void enrollFingerprint(int id) {
+  int p = -1;
+  Serial.println("Place finger...");
+  oledPrint("Place Finger");
+  while (p != FINGERPRINT_OK) { p = finger.getImage(); delay(100); }
+  p = finger.image2Tz(1); if (p != FINGERPRINT_OK) { Serial.println("⚠️ First image fail"); oledPrint("First Fail"); return; }
+  Serial.println("Remove finger"); delay(1500);
+  while (finger.getImage() != FINGERPRINT_NOFINGER) delay(100);
+  Serial.println("Place same finger again...");
+  oledPrint("Place Same Finger");
+  p = -1; while (p != FINGERPRINT_OK) { p = finger.getImage(); delay(100); }
+  p = finger.image2Tz(2); if (p != FINGERPRINT_OK) { Serial.println("⚠️ Second image fail"); oledPrint("Second Fail"); return; }
+  p = finger.createModel(); if (p != FINGERPRINT_OK) { Serial.println("⚠️ Create model fail"); oledPrint("Model Fail"); return; }
+  p = finger.storeModel(id);
+  if (p == FINGERPRINT_OK) { Serial.print("✅ Fingerprint enrolled ID: "); Serial.println(id); oledPrint("Enroll Success"); }
+  else { Serial.println("❌ Store fingerprint fail"); oledPrint("Store Fail"); }
+}
+
+// ======================
+// Firestore helpers
+// ======================
+void saveFingerprintID(String userID, int fingerprintID) {
+  if (WiFi.status() != WL_CONNECTED) { Serial.println("⚠️ Wi-Fi not connected"); return; }
+
+  String url = "https://firestore.googleapis.com/v1/projects/" + FIREBASE_PROJECT_ID + "/databases/(default)/documents/" + USER_COLLECTION + "/" + userID + "?updateMask.fieldPaths=fingerprintID";
+  String jsonData = "{\"fields\":{\"fingerprintID\":{\"integerValue\":\"" + String(fingerprintID) + "\"}}}";
+
+  WiFiClientSecure client; client.setInsecure();
+  HTTPClient http; http.begin(client, url); http.addHeader("Content-Type","application/json");
+  int code = http.PATCH(jsonData);
+  if (code > 0) { Serial.printf("✅ Firestore updated (code %d)\n", code); Serial.println(http.getString()); }
+  else Serial.printf("❌ Firestore update failed: %s\n", http.errorToString(code).c_str());
+  http.end();
+}
+
+String getUserIDByFingerprint(int fid) {
+  if (WiFi.status() != WL_CONNECTED) return "Unknown";
+  WiFiClientSecure client; client.setInsecure();
+  HTTPClient http;
+  String url = "https://firestore.googleapis.com/v1/projects/" + FIREBASE_PROJECT_ID + "/databases/(default)/documents/" + USER_COLLECTION;
+  http.begin(client, url); http.addHeader("Content-Type","application/json");
+  int code = http.GET();
+  if (code > 0) {
+    String payload = http.getString();
+    String needle = "\"integerValue\": \"" + String(fid) + "\"";
+    int pos = payload.indexOf(needle);
+    if (pos >= 0) {
+      int namePos = payload.lastIndexOf("\"name\":", pos);
+      if (namePos >= 0) {
+        int slashPos = payload.indexOf("/", namePos);
+        int quotePos = payload.indexOf("\"", slashPos+1);
+        if (quotePos > slashPos) { http.end(); return payload.substring(slashPos+1, quotePos); }
+      }
+    }
+  }
+  http.end();
+  return "Unknown";
+}
+
+String getUserRole(String userID) {
+  WiFiClientSecure client; client.setInsecure();
+  HTTPClient http;
+  String url = "https://firestore.googleapis.com/v1/projects/" + FIREBASE_PROJECT_ID + "/databases/(default)/documents/users/" + userID;
+  http.begin(client, url); http.addHeader("Content-Type","application/json");
+  int code = http.GET();
+  if (code <= 0) { http.end(); return ""; }
+  String payload = http.getString(); http.end();
+  int pos = payload.indexOf("\"role\""); if (pos < 0) return "";
+  int s = payload.indexOf("\"stringValue\"", pos); s = payload.indexOf("\"", s+14)+1;
+  int e = payload.indexOf("\"", s);
+  return payload.substring(s,e);
+}
+
+// ======================
+// Sequence handling
+// ======================
+void processUserSequence(String role, String userID) {
+  if (role == sequence[currentStep]) {
+    currentStep++;
+    if (currentStep >= 3) {
+      oledPrint("Lock Unlocked!", userID);
+      unlockSolenoid(UNLOCK_DURATION_MS);
+      currentStep = 0; // reset sequence
+    } else {
+      Serial.println("Step accepted, next role expected.");
+      oledPrint("Step Accepted", "Next: " + sequence[currentStep]);
+    }
+  } else {
+    Serial.println("⛔ Wrong role order!");
+    oledPrint("Wrong Order", "Expected: " + sequence[currentStep]);
+  }
+}
+
+// ======================
+// Solenoid control
+// ======================
+void unlockSolenoid(unsigned long durationMs) {
+  digitalWrite(SOLENOID_PIN, SOLENOID_ACTIVE_HIGH ? HIGH : LOW);
+  delay(durationMs);
+  lockSolenoid();
+}
+
+void lockSolenoid() {
+  digitalWrite(SOLENOID_PIN, SOLENOID_ACTIVE_HIGH ? LOW : HIGH);
+}
+
+// ======================
+// OLED helper
+// ======================
+void oledPrint(String line1, String line2 = "") {
+  display.clearDisplay();
+  display.setCursor(0,0);
+  display.println(line1);
+  if(line2!="") display.println(line2);
+  display.display();
+}

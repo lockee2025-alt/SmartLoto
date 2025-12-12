@@ -1,0 +1,446 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>All Companies - Smartlock LoTo</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet" />
+
+<script type="module">
+import { db } from "./firebase.js";
+import {
+  collection,
+  getDocs,
+  addDoc,
+  updateDoc,
+  deleteDoc,
+  doc,
+  serverTimestamp,
+  getDoc
+} from "https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js";
+
+// ------------------------
+// Get logged-in user
+// ------------------------
+const loggedInUser = JSON.parse(localStorage.getItem("user"));
+if (!loggedInUser) {
+  window.location.href = "index.html";
+}
+
+// ------------------------
+// DOM Elements
+// ------------------------
+const companiesTable = document.getElementById("companiesTableBody");
+const companiesContainer = document.getElementById("companiesContainer");
+const loading = document.getElementById("loading");
+
+const addCompanyModal = document.getElementById("addCompanyModal");
+const editCompanyModal = document.getElementById("editCompanyModal");
+
+const showAddModalBtn = document.getElementById("showAddModalBtn");
+const closeAddModalBtn = document.getElementById("closeAddModalBtn");
+const closeEditModalBtn = document.getElementById("closeEditModalBtn");
+
+const addCompanyForm = document.getElementById("addCompanyForm");
+const editCompanyForm = document.getElementById("editCompanyForm");
+
+// ------------------------
+// Replace Admin inputs with dropdowns
+// ------------------------
+const addAdminInput = addCompanyForm.querySelector('input[name="adminID"]');
+const editAdminInput = editCompanyForm.querySelector('input[name="adminID"]');
+
+const addAdminSelect = document.createElement("select");
+addAdminSelect.name = "adminID";
+addAdminSelect.className = "w-full border px-3 py-2 rounded";
+addAdminSelect.required = true;
+
+const editAdminSelect = document.createElement("select");
+editAdminSelect.name = "adminID";
+editAdminSelect.className = "w-full border px-3 py-2 rounded";
+editAdminSelect.required = true;
+
+addAdminInput.replaceWith(addAdminSelect);
+editAdminInput.replaceWith(editAdminSelect);
+
+// ------------------------
+// Load admins into dropdown (only same company, role: company_admin)
+// ------------------------
+async function loadAdmins() {
+  addAdminSelect.innerHTML = '<option value="">Select Company Admin</option>';
+  editAdminSelect.innerHTML = '<option value="">Select Company Admin</option>';
+
+  const usersSnap = await getDocs(collection(db, "users"));
+  usersSnap.forEach(docSnap => {
+    const user = docSnap.data();
+    // Only company admins, not super admins
+    if (user.role === "company_admin" && user.companyID === loggedInUser.companyID) {
+      const option = document.createElement("option");
+      option.value = docSnap.id;
+      option.textContent = user.fullName || user.username || "(No name)";
+      addAdminSelect.appendChild(option);
+      editAdminSelect.appendChild(option.cloneNode(true));
+    }
+  });
+}
+
+// ------------------------
+// Load companies (filter by user's company if not super_admin)
+// ------------------------
+async function loadCompanies() {
+  loading.classList.remove("hidden");
+  companiesContainer.classList.add("hidden");
+  companiesTable.innerHTML = "";
+
+  const [companiesSnapshot, usersSnapshot] = await Promise.all([
+    getDocs(collection(db, "companies")),
+    getDocs(collection(db, "users")),
+  ]);
+
+  // Map user IDs to names
+  const userMap = {};
+  usersSnapshot.forEach((u) => {
+    const user = u.data();
+    userMap[u.id] = user.fullName || "Unnamed User";
+  });
+
+  companiesSnapshot.forEach((docSnap) => {
+    const company = docSnap.data();
+
+    // Filter: show only user's company if not super admin
+    if (loggedInUser.role !== "super_admin" && company.name !== loggedInUser.companyName) return;
+
+    const createdDate = company.createdAt?.toDate
+      ? company.createdAt.toDate().toLocaleString()
+      : "N/A";
+    const tr = document.createElement("tr");
+    tr.className = "border-b hover:bg-gray-50";
+    tr.innerHTML = `
+      <td class="px-4 py-2">${company.name || ""}</td>
+      <td class="px-4 py-2">${company.address || ""}</td>
+      <td class="px-4 py-2">${company.contactEmail || ""}</td>
+      <td class="px-4 py-2">${userMap[company.adminID] || "Not Assigned"}</td>
+      <td class="px-4 py-2">${(company.roles || []).join(", ")}</td>
+      <td class="px-4 py-2">${createdDate}</td>
+      <td class="px-4 py-2 text-center space-x-2">
+        <button class="bg-blue-500 text-white px-3 py-1 rounded my-4 edit-btn" data-id="${docSnap.id}">Edit</button>
+        <button class="bg-red-500 text-white px-3 py-1 rounded delete-btn" data-id="${docSnap.id}">Delete</button>
+      </td>
+    `;
+    companiesTable.appendChild(tr);
+  });
+
+  // Edit button
+  document.querySelectorAll(".edit-btn").forEach((btn) => {
+    btn.addEventListener("click", async (e) => {
+      await loadAdmins();
+      const id = e.target.dataset.id;
+      const docSnap = companiesSnapshot.docs.find((d) => d.id === id);
+      const companyData = docSnap.data();
+
+      editCompanyForm.companyId.value = id;
+      editCompanyForm.name.value = companyData.name || "";
+      editCompanyForm.address.value = companyData.address || "";
+      editCompanyForm.contactEmail.value = companyData.contactEmail || "";
+      editAdminSelect.value = companyData.adminID || "";
+      editCompanyForm.roles.value = (companyData.roles || []).join(", ");
+      editCompanyModal.classList.remove("hidden");
+    });
+  });
+
+  // Delete button
+  document.querySelectorAll(".delete-btn").forEach((btn) => {
+    btn.addEventListener("click", async (e) => {
+      const id = e.target.dataset.id;
+      const companyDoc = await getDoc(doc(db, "companies", id));
+      const companyData = companyDoc.data();
+
+      if (confirm("Are you sure you want to delete this company?")) {
+        if (companyData?.adminID) {
+          await updateDoc(doc(db, "users", companyData.adminID), {
+            companyID: "",
+          });
+        }
+        await deleteDoc(doc(db, "companies", id));
+        alert("Company deleted successfully!");
+        await loadCompanies();
+      }
+    });
+  });
+
+  loading.classList.add("hidden");
+  companiesContainer.classList.remove("hidden");
+}
+
+// ------------------------
+// Modal buttons
+// ------------------------
+showAddModalBtn.addEventListener("click", async () => {
+  await loadAdmins();
+  addCompanyModal.classList.remove("hidden");
+});
+closeAddModalBtn.addEventListener("click", () => addCompanyModal.classList.add("hidden"));
+closeEditModalBtn.addEventListener("click", () => editCompanyModal.classList.add("hidden"));
+
+// ------------------------
+// Add company
+// ------------------------
+addCompanyForm.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const formData = Object.fromEntries(new FormData(addCompanyForm));
+
+  formData.roles = formData.roles
+    ? formData.roles.split(",").map(r => r.trim()).filter(r => r)
+    : [];
+
+  formData.createdAt = serverTimestamp();
+
+  const companyRef = await addDoc(collection(db, "companies"), formData);
+
+  if (formData.adminID) {
+    await updateDoc(doc(db, "users", formData.adminID), { companyID: companyRef.id });
+  }
+
+  addCompanyForm.reset();
+  addCompanyModal.classList.add("hidden");
+  await loadCompanies();
+});
+
+// ------------------------
+// Edit company
+// ------------------------
+editCompanyForm.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const id = editCompanyForm.companyId.value;
+  const companyRef = doc(db, "companies", id);
+  const formData = Object.fromEntries(new FormData(editCompanyForm));
+  delete formData.companyId;
+
+  formData.roles = formData.roles
+    ? formData.roles.split(",").map(r => r.trim()).filter(r => r)
+    : [];
+
+  const oldCompanyDoc = await getDoc(companyRef);
+  const oldAdminID = oldCompanyDoc.data()?.adminID;
+
+  await updateDoc(companyRef, formData);
+
+  if (oldAdminID && oldAdminID !== formData.adminID) {
+    await updateDoc(doc(db, "users", oldAdminID), { companyID: "" });
+  }
+
+  if (formData.adminID) {
+    await updateDoc(doc(db, "users", formData.adminID), { companyID: id });
+  }
+
+  editCompanyModal.classList.add("hidden");
+  await loadCompanies();
+});
+
+// ------------------------
+// Initial load
+// ------------------------
+await loadCompanies();
+</script>
+
+
+
+</head>
+
+<body class="bg-gray-100 font-sans">
+  <div class="flex min-h-screen">
+    <!-- Sidebar -->
+    <aside id="sidebar" class="w-64 bg-gray-900 text-white flex flex-col justify-between transition-all duration-300">
+      <div>
+        <div class="flex items-center gap-3 p-2 border-b border-gray-700">
+            <button id="toggleSidebar" class="bg-white/20 hover:bg-white/30 p-2 rounded-md focus:outline-none">
+                <span class="material-icons [line-height:unset!important]">menu</span>
+            </button>
+          <div class="sidebar-text">
+            <h2 class="font-semibold text-lg" id="name"></h2>
+            <p class="text-sm text-gray-400" id="position"></p>
+          </div>
+        </div>
+
+        <nav class="mt-6 space-y-1">
+          <a href="Index.html" class="flex items-center gap-3 hover:bg-gray-800 p-3 rounded-r-full">
+            <span class="material-icons">dashboard</span> 
+            <span class="sidebar-text">Dashboard</span>
+          </a>
+          <a href="Notification.html" class="flex items-center gap-3 hover:bg-gray-800 p-3 rounded-r-full">
+            <span class="material-icons">notifications</span> 
+            <span class="sidebar-text">Notification</span>
+          </a>
+          <a href="Sequence.html" class="flex items-center gap-3 hover:bg-gray-800 p-3 rounded-r-full">
+            <span class="material-icons">computer</span> 
+            <span class="sidebar-text">Sequence</span>
+          </a>
+          <a href="registration.html" class="flex items-center gap-3 hover:bg-gray-800 p-3 rounded-r-full">
+            <span class="material-icons">group</span>
+            <span class="sidebar-text">Accounts</span>
+          </a>
+          <a href="companies.html" class="flex items-center gap-3 bg-red-600 p-3 rounded-r-full">
+            <span class="material-icons">apartment</span>
+            <span class="sidebar-text">Companies</span>
+          </a>
+          <a href="locks.html" class="flex items-center gap-3 hover:bg-gray-800 p-3 rounded-r-full">
+            <span class="material-icons">lock</span>
+            <span class="sidebar-text">Locks</span>
+          </a>
+        </nav>
+      </div>
+
+      <div class="border-t border-gray-700">
+        <a id="logoutBtn" class="flex items-center gap-3 hover:bg-gray-800 p-3 cursor-pointer">
+          <span class="material-icons">logout</span> 
+          <span class="sidebar-text">Logout</span>
+        </a>
+        <a href="#" class="flex items-center gap-3 hover:bg-gray-800 p-3">
+          <span class="material-icons">account_circle</span> 
+          <span class="sidebar-text">Account</span>
+        </a>
+        <a href="#" class="flex items-center gap-3 hover:bg-gray-800 p-3">
+          <span class="material-icons">info</span> 
+          <span class="sidebar-text">About</span>
+        </a>
+      </div>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="flex-1 min-w-[300px] md:min-w-0" id="dashboard">
+      <header class="bg-red-600 text-white flex justify-between items-center px-6 py-4">
+        <h1 class="text-2xl font-bold">All Companies</h1>
+        <div>
+        <button id="showAddModalBtn" class="bg-white text-red-600 px-4 py-2 rounded-md hover:bg-gray-200 transition">
+          + Add Company
+        </button>
+        </div>
+      </header>
+
+      <!-- 🔹 Loading Spinner -->
+      <div id="loading" class="flex flex-col justify-center items-center py-20">
+        <div class="animate-spin rounded-full h-12 w-12 border-4 border-red-500 border-t-transparent mb-4"></div>
+        <p class="text-gray-600">Loading users...</p>
+      </div>
+
+      <!-- 🔹 Users Table -->
+<div id="companiesContainer" class="p-6 hidden">
+    <div class="w-full overflow-x-auto">
+        <div class="inline-block min-w-full align-middle">
+          <div class="overflow-hidden border border-gray-200 rounded-lg shadow">
+            <table class="min-w-[800px] w-full divide-y divide-gray-200 bg-white">
+              <thead class="bg-gray-200 text-gray-600 uppercase text-sm">
+                <tr>
+                  <th class="px-4 py-2 text-left whitespace-nowrap">Name</th>
+                  <th class="px-4 py-2 text-left whitespace-nowrap">Address</th>
+                  <th class="px-4 py-2 text-left whitespace-nowrap">Contact Email</th>
+                  <th class="px-4 py-2 text-left whitespace-nowrap">Admin ID</th>
+                  <th class="px-4 py-2 text-left whitespace-nowrap">Roles</th>
+                  <th class="px-4 py-2 text-left whitespace-nowrap">Created At</th>
+                  <th class="px-4 py-2 text-center whitespace-nowrap">Action</th>
+                </tr>
+              </thead>
+              <tbody id="companiesTableBody" class="text-gray-700 divide-y"></tbody>
+            </table>
+          </div>
+        </div>
+    </div>
+</div>
+
+
+  <!-- Add Company Modal -->
+    <div id="addCompanyModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden">
+      <div class="bg-white rounded-lg p-6 w-full max-w-md">
+        <h2 class="text-xl font-semibold mb-4">Add New Company</h2>
+        <form id="addCompanyForm" class="space-y-3">
+          <input name="name" type="text" placeholder="Company Name" class="w-full border px-3 py-2 rounded" required>
+          <input name="address" type="text" placeholder="Address" class="w-full border px-3 py-2 rounded" required>
+          <input name="contactEmail" type="email" placeholder="Contact Email" class="w-full border px-3 py-2 rounded" required>
+          <input name="adminID" type="text" placeholder="Admin ID" class="w-full border px-3 py-2 rounded">
+          <input name="roles" type="text" placeholder="Enter roles separated by comma" class="w-full border px-3 py-2 rounded">
+            <p class="text-sm text-gray-500">Example: super_admin, company_admin, normal_user</p>
+          <div class="flex justify-end gap-2">
+            <button type="button" id="closeAddModalBtn" class="px-4 py-2 bg-gray-400 rounded text-white">Cancel</button>
+            <button type="submit" class="px-4 py-2 bg-red-600 text-white rounded">Create</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+  <div id="editCompanyModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden">
+      <div class="bg-white rounded-lg p-6 w-full max-w-md">
+        <h2 class="text-xl font-semibold mb-4">Edit Company</h2>
+        <form id="editCompanyForm" class="space-y-3">
+          <input type="hidden" name="companyId">
+          <input name="name" type="text" placeholder="Company Name" class="w-full border px-3 py-2 rounded" required>
+          <input name="address" type="text" placeholder="Address" class="w-full border px-3 py-2 rounded" required>
+          <input name="contactEmail" type="email" placeholder="Contact Email" class="w-full border px-3 py-2 rounded" required>
+          <input name="adminID" type="text" placeholder="Admin ID" class="w-full border px-3 py-2 rounded">
+          <input name="roles" type="text" placeholder="Roles (comma separated)" class="w-full border px-3 py-2 rounded">
+          <div class="flex justify-end gap-2">
+            <button type="button" id="closeEditModalBtn" class="px-4 py-2 bg-gray-400 rounded text-white">Cancel</button>
+            <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded">Save Changes</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  <script>
+    const toggleButton = document.getElementById("toggleSidebar");
+    const sidebar = document.getElementById("sidebar");
+    const textElements = document.querySelectorAll(".sidebar-text");
+    const dashboard = document.getElementById("dashboard");
+  
+    // Collapse sidebar by default on mobile
+    if (window.innerWidth < 1024) {
+      sidebar.classList.remove("w-64");
+      sidebar.classList.add("w-14");
+      textElements.forEach(el => el.classList.add("hidden"));
+    }
+  
+    toggleButton.addEventListener("click", () => {
+      if (window.innerWidth < 1024) {
+        // MOBILE: toggle full-screen sidebar
+        sidebar.classList.toggle("fixed");
+        sidebar.classList.toggle("inset-0");
+        sidebar.classList.toggle("!w-full");
+        sidebar.classList.toggle("z-50");
+        dashboard.classList.toggle("hidden");
+  
+        // toggle text visibility
+        textElements.forEach(el => {
+          el.classList.toggle("hidden");
+        });
+      } else {
+        // DESKTOP: toggle between wide and collapsed
+        sidebar.classList.toggle("w-64");
+        sidebar.classList.toggle("w-14");
+        textElements.forEach(el => {
+          el.classList.toggle("hidden");
+        });
+      }
+    });
+  </script>
+
+  <script type="module">
+    import { db } from "./firebase.js";
+    const loggedInUser = JSON.parse(localStorage.getItem("user"));
+    const name = document.getElementById("name");
+    const position = document.getElementById("position");
+
+    if (!loggedInUser) {
+      window.location.href = "index.html";
+    } else {
+      name.innerHTML = loggedInUser.fullName || "N/A";
+      position.innerHTML = loggedInUser.role || "N/A";
+    }
+
+      const logoutBtn = document.getElementById("logoutBtn");
+      logoutBtn.onclick = () => {
+        localStorage.removeItem("user");
+        window.location.href = "index.html";
+      };
+  </script>
+  
+</body>
+</html>

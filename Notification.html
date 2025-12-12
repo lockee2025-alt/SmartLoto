@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Notifications - Rimberio</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+
+  <style>
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(8px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .animate-fadeIn {
+      animation: fadeIn 0.3s ease-in-out;
+    }
+  </style>
+</head>
+<body class="bg-gray-100 font-sans">
+  <div class="flex min-h-screen">
+
+    <!-- Sidebar -->
+    <aside id="sidebar" class="w-64 bg-gray-900 text-white flex flex-col justify-between transition-all duration-300">
+      <div>
+        <div class="flex items-center gap-3 p-2 border-b border-gray-700">
+            <button id="toggleSidebar" class="bg-white/20 hover:bg-white/30 p-2 rounded-md focus:outline-none">
+                <span class="material-icons [line-height:unset!important]">menu</span>
+            </button>
+          <div class="sidebar-text">
+            <h2 class="font-semibold text-lg" id="name"></h2>
+            <p class="text-sm text-gray-400" id="position"></p>
+          </div>
+        </div>
+
+        <nav class="mt-6 space-y-1">
+          <a href="Dashboard.html" class="flex items-center gap-3 hover:bg-gray-800 p-3 rounded-r-full">
+            <span class="material-icons">dashboard</span> 
+            <span class="sidebar-text">Dashboard</span>
+          </a>
+          <a href="Notification.html" class="flex items-center gap-3 bg-red-600 p-3 rounded-r-full">
+            <span class="material-icons">notifications</span> 
+            <span class="sidebar-text">Notification</span>
+          </a>
+          <a href="Sequence.html" class="flex items-center gap-3 hover:bg-gray-800 p-3 rounded-r-full">
+            <span class="material-icons">computer</span> 
+            <span class="sidebar-text">Sequence</span>
+          </a>
+          <a href="registration.html" id="navAccounts" class="flex items-center gap-3 hover:bg-gray-800 p-3 rounded-r-full">
+            <span class="material-icons">group</span>
+            <span class="sidebar-text">Accounts</span>
+          </a>
+          <a href="companies.html" id="navCompanies" class="flex items-center gap-3 hover:bg-gray-800 p-3 rounded-r-full">
+            <span class="material-icons">apartment</span>
+            <span class="sidebar-text">Companies</span>
+          </a>
+          <a href="locks.html" id="navLocks" class="flex items-center gap-3 hover:bg-gray-800 p-3 rounded-r-full">
+            <span class="material-icons">lock</span>
+            <span class="sidebar-text">Locks</span>
+          </a>
+        </nav>
+      </div>
+
+      <div class="border-t border-gray-700">
+        <a id="logoutBtn" class="flex items-center gap-3 hover:bg-gray-800 p-3 cursor-pointer">
+          <span class="material-icons">logout</span> 
+          <span class="sidebar-text">Logout</span>
+        </a>
+        <a href="#" class="flex items-center gap-3 hover:bg-gray-800 p-3">
+          <span class="material-icons">account_circle</span> 
+          <span class="sidebar-text">Account</span>
+        </a>
+        <a href="#" class="flex items-center gap-3 hover:bg-gray-800 p-3">
+          <span class="material-icons">info</span> 
+          <span class="sidebar-text">About</span>
+        </a>
+      </div>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="flex-1 max-w-[85%] md:max-w-none" id="dashboard">
+      <!-- Header -->
+      <header class="bg-red-600 text-white flex justify-between items-center px-6 py-4">
+        <div>
+          <h1 class="text-2xl font-bold">Notifications</h1>
+          <p class="text-sm text-white/80">Recent activities and lock updates in your company</p>
+        </div>
+      </header>
+
+      <!-- Notifications Section -->
+      <section class="p-0 md:p-6">
+        <div class="bg-white rounded-xl shadow p-4">
+          <h2 class="text-lg font-semibold mb-4">Recent Activity</h2>
+          <div id="notificationsWrapper" class="h-[400px] md:h-[600px] overflow-y-auto pr-2 scrollbar-thin scroll-smooth">
+          <div id="notificationsContainer" class="space-y-3">
+            <p class="text-gray-500 text-sm text-center">Loading notifications...</p>
+          </div>
+        </div>
+
+        </div>
+      </section>
+    </main>
+  </div>
+<script type="module">
+  import { setupSidebar } from "./notificationScript/mainSidebar.js";
+  import { loadNotifications } from "./notificationScript/notifications.js";
+
+  const loggedInUser = JSON.parse(localStorage.getItem("user"));
+  if (!loggedInUser) window.location.href = "index.html";
+
+  setupSidebar(loggedInUser);
+  loadNotifications(loggedInUser);
+</script>
+</body>
+</html>

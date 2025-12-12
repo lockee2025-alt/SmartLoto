@@ -1,0 +1,627 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>All Locks - Smartlock LoTo</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+
+<script type="module">
+  import { db } from "./firebase.js";
+  import {
+    collection,
+    getDocs,
+    getDoc,
+    addDoc,
+    updateDoc,
+    deleteDoc,
+    doc,
+    serverTimestamp,
+    Timestamp,
+  } from "https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js";
+
+  document.addEventListener("DOMContentLoaded", async () => {
+    const locksTable = document.getElementById("locksTableBody");
+    const locksContainer = document.getElementById("locksContainer");
+    const loading = document.getElementById("loading");
+    const addNpmBtn = document.getElementById("addNpmBtn");
+
+    const addLockModal = document.getElementById("addLockModal");
+    const editLockModal = document.getElementById("editLockModal");
+
+    const showAddModalBtn = document.getElementById("showAddModalBtn");
+    const closeAddModalBtn = document.getElementById("closeAddModalBtn");
+    const closeEditModalBtn = document.getElementById("closeEditModalBtn");
+
+    const addLockForm = document.getElementById("addLockForm");
+    const editLockForm = document.getElementById("editLockForm");
+
+    const addAssignedContainer = document.getElementById("assignedUsersContainer");
+    const editAssignedContainer = document.getElementById("editAssignedUsersContainer");
+
+    const loggedInUser = JSON.parse(localStorage.getItem("user"));
+
+    let companiesDocs = [];
+const showAddNpmModalBtn = document.getElementById("showAddNpmModalBtn");
+const addNpmModal = document.getElementById("addNpmModal");
+const closeAddNpmModalBtn = document.getElementById("closeAddNpmModalBtn");
+const addNpmForm = document.getElementById("addNpmForm");
+
+showAddNpmModalBtn.addEventListener("click", () => {
+  addNpmModal.classList.remove("hidden");
+});
+
+closeAddNpmModalBtn.addEventListener("click", () => {
+  addNpmModal.classList.add("hidden");
+});
+
+addNpmForm.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const dateValue = addNpmForm.date.value; // e.g., "2025-11-20"
+
+  if (!dateValue) return alert("Please select a date");
+
+  try {
+    // Convert the date string to a JS Date, then Firestore Timestamp
+    const jsDate = new Date(dateValue);
+    const timestamp = Timestamp.fromDate(jsDate);
+
+    await addDoc(collection(db, "npm"), {
+      date: timestamp,         // Store as Firestore timestamp
+      createdAt: serverTimestamp(),
+      companyId: loggedInUser.companyID // make sure to add companyId
+    });
+
+    alert("Next Preventive Maintenance date added!");
+    addNpmForm.reset();
+    addNpmModal.classList.add("hidden");
+  } catch (err) {
+    console.error(err);
+    alert("Failed to add NPM date.");
+  }
+});
+
+
+    // Load companies and set company dropdowns
+    async function loadDropdowns() {
+      const companiesSnap = await getDocs(collection(db, "companies"));
+      companiesDocs = companiesSnap.docs;
+
+      let companyOptions = "";
+
+      if (loggedInUser.role === "super_admin") {
+        companyOptions = companiesDocs.map(c => {
+          const company = c.data();
+          return `<option value="${c.id}">${company.name}</option>`;
+        }).join("");
+        addLockForm.querySelector('[name="companyID"]').disabled = false;
+        editLockForm.querySelector('[name="companyID"]').disabled = false;
+        document.getElementById('addCompanyContainer').classList.remove('hidden');
+        document.getElementById('editCompanyContainer').classList.remove('hidden');
+      } else {
+        companyOptions = companiesDocs
+          .filter(c => c.id === loggedInUser.companyID)
+          .map(c => {
+            const company = c.data();
+            return `<option value="${c.id}" selected>${company.name}</option>`;
+          }).join("");
+        addLockForm.querySelector('[name="companyID"]').disabled = true;
+        editLockForm.querySelector('[name="companyID"]').disabled = true;
+        document.getElementById('addCompanyContainer').classList.add('hidden');
+        document.getElementById('editCompanyContainer').classList.add('hidden');
+      }
+
+      addLockForm.querySelector('[name="companyID"]').innerHTML = companyOptions;
+      editLockForm.querySelector('[name="companyID"]').innerHTML = companyOptions;
+
+      setupAddRoleButton("addUserBtn", "assignedUsersContainer");
+      setupAddRoleButton("editAddUserBtn", "editAssignedUsersContainer");
+    }
+
+    // Create role selection row
+    function createAssignedRoleRow(roleOptions, selectedRole = "", sequence = "") {
+      const div = document.createElement("div");
+      div.className = "flex items-center justify-between bg-gray-50 border rounded-lg p-3 shadow-sm";
+
+      div.innerHTML = `
+        <div class="flex flex-col flex-1">
+          <label class="text-xs text-gray-500">Role</label>
+          <select class="assigned-role w-full border rounded px-2 py-1">
+            <option value="">Select role...</option>
+            ${roleOptions.map(r => `<option value="${r}">${r}</option>`).join("")}
+          </select>
+        </div>
+        <div class="flex flex-col w-24">
+          <label class="text-xs text-gray-500 text-center">Sequence</label>
+          <input type="number" min="1" value="${sequence}" placeholder="#" class="sequence-input w-full border rounded px-2 py-1 text-center">
+        </div>
+        <button type="button" class="remove-role text-red-500 hover:text-red-700 text-xl font-bold ml-2">×</button>
+      `;
+      if (selectedRole) div.querySelector(".assigned-role").value = selectedRole;
+      div.querySelector(".remove-role").addEventListener("click", () => div.remove());
+      return div;
+    }
+
+    function populateAssignedRoleFields(container, existing = [], companyID = "") {
+      container.innerHTML = "";
+      const company = companiesDocs.find(c => c.id === companyID);
+      const roles = company?.data()?.roles || [];
+
+      existing.forEach(e => {
+        container.appendChild(createAssignedRoleRow(roles, e.roleID, e.sequence));
+      });
+    }
+
+    function setupAddRoleButton(buttonId, containerId) {
+      const btn = document.getElementById(buttonId);
+      const container = document.getElementById(containerId);
+      if (!btn || !container) return;
+
+      btn.addEventListener("click", () => {
+        const form = btn.closest("form");
+        const companySelect = form.querySelector('[name="companyID"]');
+        const companyID = companySelect.value;
+        if (!companyID) {
+          alert("Please select a company first.");
+          return;
+        }
+        const company = companiesDocs.find(c => c.id === companyID);
+        const roles = company?.data()?.roles || [];
+        container.appendChild(createAssignedRoleRow(roles));
+      });
+    }
+
+    // Load locks and display
+    async function loadLocks() {
+      loading.classList.remove("hidden");
+      locksContainer.classList.add("hidden");
+      locksTable.innerHTML = "";
+
+      const locksSnap = await getDocs(collection(db, "locks"));
+      const locksDocs = locksSnap.docs;
+
+      const companyMap = {};
+      companiesDocs.forEach(c => companyMap[c.id] = c.data().name);
+
+      let filteredLocks = locksDocs;
+      if (loggedInUser.role !== "super_admin") {
+        filteredLocks = locksDocs.filter(l => l.data().companyID === loggedInUser.companyID);
+      }
+
+      filteredLocks.forEach(docSnap => {
+        const lock = docSnap.data();
+        const assignedList = (lock.assignedRoles || [])
+          .sort((a, b) => a.sequence - b.sequence)
+          .map(r => `${r.roleID} (#${r.sequence})`)
+          .join(", ");
+
+        const canControlLock = loggedInUser.id === lock.currentUser;
+
+        const tr = document.createElement("tr");
+        tr.className = "border-b hover:bg-gray-50";
+        tr.innerHTML = `
+          <td class="px-4 py-2">${lock.name || ""}</td>
+          <td class="px-4 py-2 capitalize">${lock.status || "locked"}</td>
+          <td class="px-4 py-2">${lock.currentUser || "None"}</td>
+          <td class="px-4 py-2">${assignedList}</td>
+          <td class="px-4 py-2">${companyMap[lock.companyID] || "None"}</td>
+          <td class="px-4 py-2">${lock.location || ""}</td>
+          <td class="px-4 py-2">${lock.sequenceStep || 0} / ${lock.sequenceTotal || 0}</td>
+          <td class="px-4 py-2">${lock.updatedAt?.toDate ? lock.updatedAt.toDate().toLocaleString() : "—"}</td>
+          <td class="px-4 py-2 text-center space-x-2">
+            <button class="bg-blue-500 text-white px-3 py-1 rounded edit-btn" data-id="${docSnap.id}">Edit</button>
+            <button class="bg-red-500 text-white px-3 py-1 rounded delete-btn" data-id="${docSnap.id}">Delete</button>
+          </td>
+        `;
+        locksTable.appendChild(tr);
+      });
+
+      // Edit lock
+      document.querySelectorAll(".edit-btn").forEach(btn => {
+        btn.addEventListener("click", async e => {
+          const id = e.target.dataset.id;
+          const lockDoc = locksDocs.find(d => d.id === id);
+          const lockData = lockDoc.data();
+
+          editLockForm.lockId.value = id;
+          editLockForm.name.value = lockData.name || "";
+          editLockForm.companyID.value = lockData.companyID || "";
+          editLockForm.location.value = lockData.location || "";
+          editLockForm.sequenceStep.value = lockData.sequenceStep || 0;
+          editLockForm.sequenceTotal.value = lockData.sequenceTotal || 0;
+
+          populateAssignedRoleFields(editAssignedContainer, lockData.assignedRoles || [], lockData.companyID);
+          editLockModal.classList.remove("hidden");
+        });
+      });
+
+      // Delete lock
+      document.querySelectorAll(".delete-btn").forEach(btn => {
+        btn.addEventListener("click", async e => {
+          const id = e.target.dataset.id;
+          if (confirm("Delete this lock?")) {
+            await deleteDoc(doc(db, "locks", id));
+            alert("Lock deleted!");
+            await loadLocks();
+          }
+        });
+      });
+
+      loading.classList.add("hidden");
+      locksContainer.classList.remove("hidden");
+    }
+
+    showAddModalBtn.addEventListener("click", async () => {
+      await loadDropdowns();
+      addLockModal.classList.remove("hidden");
+    });
+    closeAddModalBtn.addEventListener("click", () => addLockModal.classList.add("hidden"));
+    closeEditModalBtn.addEventListener("click", () => editLockModal.classList.add("hidden"));
+
+    await loadDropdowns();
+    await loadLocks();
+
+    // Add Lock
+    addLockForm.addEventListener("submit", async e => {
+      e.preventDefault();
+      const formData = Object.fromEntries(new FormData(addLockForm));
+      formData.updatedAt = serverTimestamp();
+
+      if (loggedInUser.role === "company_admin") formData.companyID = loggedInUser.companyID;
+
+      const assigned = Array.from(addAssignedContainer.children).map(row => {
+        const roleSel = row.querySelector(".assigned-role");
+        const seqInput = row.querySelector(".sequence-input");
+        return { roleID: roleSel.value, sequence: Number(seqInput.value) || 0 };
+      }).filter(a => a.roleID);
+
+
+      const sequences = assigned.map(a => a.sequence);
+      if (new Set(sequences).size !== sequences.length) {
+        alert("Duplicate sequence numbers are not allowed.");
+        return;
+      }
+
+      assigned.sort((a, b) => a.sequence - b.sequence);
+      formData.assignedRoles = assigned;
+      formData.sequenceStep = 1;
+      formData.sequenceTotal = assigned.length;
+      formData.currentUser = assigned[0]?.roleID || null;
+
+      await addDoc(collection(db, "locks"), formData);
+      addLockForm.reset();
+      addLockModal.classList.add("hidden");
+      await loadLocks();
+    });
+
+    // Edit Lock
+    editLockForm.addEventListener("submit", async e => {
+      e.preventDefault();
+      const id = editLockForm.lockId.value;
+      const formData = Object.fromEntries(new FormData(editLockForm));
+      formData.updatedAt = serverTimestamp();
+
+    const assigned = Array.from(editAssignedContainer.children).map(row => {
+      const roleSel = row.querySelector(".assigned-role");
+      const seqInput = row.querySelector(".sequence-input");
+      return { roleID: roleSel.value, sequence: Number(seqInput.value) || 0 };
+    }).filter(a => a.roleID);
+
+      const sequences = assigned.map(a => a.sequence);
+      if (new Set(sequences).size !== sequences.length) {
+        alert("Duplicate sequence numbers are not allowed.");
+        return;
+      }
+
+      assigned.sort((a, b) => a.sequence - b.sequence);
+      formData.assignedRoles = assigned;
+      formData.sequenceTotal = assigned.length;
+      if (!formData.sequenceStep || formData.sequenceStep < 1 || formData.sequenceStep > assigned.length) {
+        formData.sequenceStep = 1;
+      }
+      formData.currentUser = assigned[formData.sequenceStep - 1]?.roleID || null;
+
+      delete formData.lockId;
+      await updateDoc(doc(db, "locks", id), formData);
+
+      await addDoc(collection(db, "logs"), {
+        lockID: id,
+        userID: loggedInUser.fullName,
+        companyID: loggedInUser.companyID,
+        action: "edit",
+        timestamp: serverTimestamp(),
+        result: "success",
+      });
+
+      editLockModal.classList.add("hidden");
+      await loadLocks();
+    });
+  });
+</script>
+
+
+</head>
+
+<body class="bg-gray-100 font-sans">
+  <div class="flex min-h-screen">
+    <!-- Sidebar -->
+        <aside id="sidebar" class="w-64 bg-gray-900 text-white flex flex-col justify-between transition-all duration-300">
+      <div>
+        <div class="flex items-center gap-3 p-2 border-b border-gray-700">
+            <button id="toggleSidebar" class="bg-white/20 hover:bg-white/30 p-2 rounded-md focus:outline-none">
+                <span class="material-icons [line-height:unset!important]">menu</span>
+            </button>
+          <div class="sidebar-text">
+            <h2 class="font-semibold text-lg" id="name"></h2>
+            <p class="text-sm text-gray-400" id="position"></p>
+          </div>
+        </div>
+
+        <nav class="mt-6 space-y-1">
+          <a href="Dashboard.html" class="flex items-center gap-3 hover:bg-gray-800 p-3 rounded-r-full">
+            <span class="material-icons">dashboard</span> 
+            <span class="sidebar-text">Dashboard</span>
+          </a>
+          <a href="Notification.html" class="flex items-center gap-3 hover:bg-gray-800 p-3 rounded-r-full">
+            <span class="material-icons">notifications</span> 
+            <span class="sidebar-text">Notification</span>
+          </a>
+          <a href="Sequence.html" class="flex items-center gap-3 hover:bg-gray-800 p-3 rounded-r-full">
+            <span class="material-icons">computer</span> 
+            <span class="sidebar-text">Sequence</span>
+          </a>
+          <a href="registration.html" class="flex items-center gap-3 hover:bg-gray-800 p-3 rounded-r-full">
+            <span class="material-icons">group</span>
+            <span class="sidebar-text">Accounts</span>
+          </a>
+          <a href="companies.html" class="flex items-center gap-3 hover:bg-gray-800 p-3 rounded-r-full">
+            <span class="material-icons">apartment</span>
+            <span class="sidebar-text">Companies</span>
+          </a>
+          <a href="locks.html" class="flex items-center gap-3 bg-red-600 p-3 rounded-r-full">
+            <span class="material-icons">lock</span>
+            <span class="sidebar-text">Locks</span>
+          </a>
+        </nav>
+      </div>
+
+      <div class="border-t border-gray-700">
+        <a id="logoutBtn" class="flex items-center gap-3 hover:bg-gray-800 p-3 cursor-pointer">
+          <span class="material-icons">logout</span> 
+          <span class="sidebar-text">Logout</span>
+        </a>
+        <a href="#" class="flex items-center gap-3 hover:bg-gray-800 p-3">
+          <span class="material-icons">account_circle</span> 
+          <span class="sidebar-text">Account</span>
+        </a>
+        <a href="#" class="flex items-center gap-3 hover:bg-gray-800 p-3">
+          <span class="material-icons">info</span> 
+          <span class="sidebar-text">About</span>
+        </a>
+      </div>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="flex-1 min-w-[300px] md:min-w-0" id="dashboard">
+    <header class="bg-red-600 text-white flex justify-between items-center px-6 py-4">
+      <h1 class="text-2xl font-bold">All Locks</h1>
+      <div class="flex gap-2">
+        <button id="showAddModalBtn" class="bg-white text-red-600 px-4 py-2 rounded-md hover:bg-gray-200 transition">
+          + Add Lock
+        </button>
+        <button id="showAddNpmModalBtn" class="bg-white text-purple-600 px-4 py-2 rounded-md hover:bg-gray-200 transition">
+          + Add NPM
+        </button>
+      </div>
+    </header>
+
+      <div id="loading" class="flex flex-col justify-center items-center py-20">
+        <div class="animate-spin rounded-full h-12 w-12 border-4 border-red-500 border-t-transparent mb-4"></div>
+        <p class="text-gray-600">Loading locks...</p>
+      </div>
+
+      <div id="locksContainer" class="p-6 hidden">
+        <div class="w-full overflow-x-auto">
+          <div class="inline-block min-w-full align-middle">
+            <div class="overflow-hidden border border-gray-200 rounded-lg shadow">
+              <table class="min-w-[900px] w-full divide-y divide-gray-200 bg-white">
+                <thead class="bg-gray-200 text-gray-600 uppercase text-sm">
+                  <tr>
+                    <th class="px-4 py-2 text-left">Name</th>
+                    <th class="px-4 py-2 text-left">Status</th>
+                    <th class="px-4 py-2 text-left">Current Role</th>
+                    <th class="px-4 py-2 text-left">Assigned Roles</th>
+                    <th class="px-4 py-2 text-left">Company</th>
+                    <th class="px-4 py-2 text-left">Location</th>
+                    <th class="px-4 py-2 text-left">Sequence</th>
+                    <th class="px-4 py-2 text-left">Updated At</th>
+                    <th class="px-4 py-2 text-center">Action</th>
+                  </tr>
+                </thead>
+                <tbody id="locksTableBody" class="text-gray-700 divide-y"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+<!-- Add NPM Modal -->
+<div id="addNpmModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden">
+  <div class="bg-white rounded-lg p-6 w-full max-w-sm">
+    <h2 class="text-xl font-semibold mb-4">Add Next Preventive Maintenance</h2>
+    <form id="addNpmForm" class="space-y-3">
+      <div>
+        <label class="block text-sm font-medium mb-1">Date</label>
+        <input type="date" name="date" class="w-full border px-3 py-2 rounded" required>
+      </div>
+
+      <div class="flex justify-end gap-2 pt-2">
+        <button type="button" id="closeAddNpmModalBtn" class="px-4 py-2 bg-gray-400 rounded text-white">Cancel</button>
+        <button type="submit" class="px-4 py-2 bg-purple-600 text-white rounded">Save</button>
+      </div>
+    </form>
+  </div>
+</div>
+    <!-- Add Lock Modal -->
+    <div id="addLockModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden">
+    <div class="bg-white rounded-lg p-6 w-full max-w-md">
+        <h2 class="text-xl font-semibold mb-4">Add New Lock</h2>
+        <form id="addLockForm" class="space-y-3">
+        <div>
+            <label class="block text-sm font-medium mb-1">Lock Name</label>
+            <input name="name" type="text" placeholder="Lock Name" class="w-full border px-3 py-2 rounded" required>
+        </div>
+        <div id="addCompanyContainer">
+          <label class="block text-sm font-medium mb-1">Company</label>
+          <select name="companyID" id="addCompanyID" class="w-full border px-3 py-2 rounded"></select>
+        </div>
+
+        <div>
+            <label class="block text-sm font-medium mb-1">Location</label>
+            <input name="location" type="text" placeholder="e.g. Control Room A" class="w-full border px-3 py-2 rounded">
+        </div>
+
+        <div class="flex gap-2">
+            <div class="w-1/2">
+            <label class="block text-sm font-medium mb-1">Sequence Step</label>
+            <input name="sequenceStep" type="number" placeholder="1" class="w-full border px-3 py-2 rounded">
+            </div>
+            <div class="w-1/2">
+            <label class="block text-sm font-medium mb-1">Sequence Total</label>
+            <input name="sequenceTotal" type="number" placeholder="3" class="w-full border px-3 py-2 rounded">
+            </div>
+        </div>
+
+        <div>
+            <label class="block text-sm font-medium mb-1">Assigned Role (with sequence)</label>
+            <div id="assignedUsersContainer" class="space-y-2"></div>
+            <button type="button" id="addUserBtn" class="mt-2 px-3 py-1 bg-green-600 text-white rounded">+ Roler</button>
+            <p class="text-xs text-gray-500 mt-1">Add role in order — the first will be sequence step 1.</p>
+        </div>
+
+        <div class="flex justify-end gap-2 pt-2">
+            <button type="button" id="closeAddModalBtn" class="px-4 py-2 bg-gray-400 rounded text-white">Cancel</button>
+            <button type="submit" class="px-4 py-2 bg-red-600 text-white rounded">Create</button>
+        </div>
+        </form>
+    </div>
+    </div>
+
+    <!-- Edit Lock Modal -->
+    <div id="editLockModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden">
+    <div class="bg-white rounded-lg p-6 w-full max-w-md">
+        <h2 class="text-xl font-semibold mb-4">Edit Lock</h2>
+        <form id="editLockForm" class="space-y-3">
+        <input type="hidden" name="lockId">
+
+        <div>
+            <label class="block text-sm font-medium mb-1">Lock Name</label>
+            <input name="name" type="text" placeholder="Lock Name" class="w-full border px-3 py-2 rounded" required>
+        </div>
+        <div id="editCompanyContainer">
+          <label class="block text-sm font-medium mb-1">Company</label>
+          <select name="companyID" id="editCompanyID" class="w-full border px-3 py-2 rounded"></select>
+        </div>
+
+        <div>
+            <label class="block text-sm font-medium mb-1">Location</label>
+            <input name="location" type="text" placeholder="e.g. Control Room A" class="w-full border px-3 py-2 rounded">
+        </div>
+
+        <div class="flex gap-2">
+            <div class="w-1/2">
+            <label class="block text-sm font-medium mb-1">Sequence Step</label>
+            <input name="sequenceStep" type="number" placeholder="1" class="w-full border px-3 py-2 rounded">
+            </div>
+            <div class="w-1/2">
+            <label class="block text-sm font-medium mb-1">Sequence Total</label>
+            <input name="sequenceTotal" type="number" placeholder="3" class="w-full border px-3 py-2 rounded">
+            </div>
+        </div>
+
+        <div>
+            <label class="block text-sm font-medium mb-1">Assigned Role (with sequence)</label>
+            <div id="editAssignedUsersContainer" class="space-y-2"></div>
+            <button
+                type="button"
+                id="editAddUserBtn"
+                class="mt-2 px-3 py-1 bg-green-600 text-white rounded hover:bg-green-700 transition"
+            >
+                + Role
+            </button>
+            <p class="text-xs text-gray-500 mt-1">
+                Add role in the correct order — the first will be sequence step 1.
+            </p>
+        </div>
+
+        <div class="flex justify-end gap-2 pt-2">
+            <button type="button" id="closeEditModalBtn" class="px-4 py-2 bg-gray-400 rounded text-white">Cancel</button>
+            <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded">Save Changes</button>
+        </div>
+        </form>
+    </div>
+    </div>
+    </main>
+  </div>
+  <script>
+    const toggleButton = document.getElementById("toggleSidebar");
+    const sidebar = document.getElementById("sidebar");
+    const textElements = document.querySelectorAll(".sidebar-text");
+    const dashboard = document.getElementById("dashboard");
+  
+    // Collapse sidebar by default on mobile
+    if (window.innerWidth < 1024) {
+      sidebar.classList.remove("w-64");
+      sidebar.classList.add("w-14");
+      textElements.forEach(el => el.classList.add("hidden"));
+    }
+  
+    toggleButton.addEventListener("click", () => {
+      if (window.innerWidth < 1024) {
+        // MOBILE: toggle full-screen sidebar
+        sidebar.classList.toggle("fixed");
+        sidebar.classList.toggle("inset-0");
+        sidebar.classList.toggle("!w-full");
+        sidebar.classList.toggle("z-50");
+        dashboard.classList.toggle("hidden");
+  
+        // toggle text visibility
+        textElements.forEach(el => {
+          el.classList.toggle("hidden");
+        });
+      } else {
+        // DESKTOP: toggle between wide and collapsed
+        sidebar.classList.toggle("w-64");
+        sidebar.classList.toggle("w-14");
+        textElements.forEach(el => {
+          el.classList.toggle("hidden");
+        });
+      }
+    });
+  </script>
+
+<script type="module">
+  import { db } from "./firebase.js";
+
+  const loggedInUser = JSON.parse(localStorage.getItem("user"));
+
+  const name = document.getElementById("name");
+  const position = document.getElementById("position");
+  const secondName = document.getElementById("secondName");
+
+  if (!loggedInUser) {
+    window.location.href = "index.html";
+  } else {
+    name.innerHTML = loggedInUser.fullName || "N/A";
+    secondName.innerHTML = loggedInUser.fullName || "N/A";
+    position.innerHTML = loggedInUser.role || "N/A";
+  }
+
+      const logoutBtn = document.getElementById("logoutBtn");
+      logoutBtn.onclick = () => {
+        localStorage.removeItem("user");
+        window.location.href = "index.html";
+      };
+</script>
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet" />
+</body>
+</html>

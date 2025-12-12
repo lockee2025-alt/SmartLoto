@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Smartlock LoTo Dashboard</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Material Icons -->
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+</head>
+<body class="bg-gray-100 font-sans">
+
+  <div class="flex min-h-screen">
+
+    <!-- Sidebar -->
+    <aside id="sidebar" class="w-64 bg-gray-900 text-white flex flex-col justify-between transition-all duration-300">
+      <div>
+        <div class="flex items-center gap-3 p-2 border-b border-gray-700">
+            <button id="toggleSidebar" class="bg-white/20 hover:bg-white/30 p-2 rounded-md focus:outline-none">
+                <span class="material-icons [line-height:unset!important]">menu</span>
+            </button>
+          <div class="sidebar-text">
+            <h2 class="font-semibold text-lg" id="name"></h2>
+            <p class="text-sm text-gray-400" id="position"></p>
+          </div>
+        </div>
+
+        <nav class="mt-6 space-y-1">
+          <a href="Dashboard.html" class="flex items-center gap-3 bg-red-600 p-3 rounded-r-full">
+            <span class="material-icons">dashboard</span> 
+            <span class="sidebar-text">Dashboard</span>
+          </a>
+          <a href="Notification.html" class="flex items-center gap-3 hover:bg-gray-800 p-3 rounded-r-full">
+            <span class="material-icons">notifications</span> 
+            <span class="sidebar-text">Notification</span>
+          </a>
+          <a href="Sequence.html" class="flex items-center gap-3 hover:bg-gray-800 p-3 rounded-r-full">
+            <span class="material-icons">computer</span> 
+            <span class="sidebar-text">Sequence</span>
+          </a>
+          <a href="registration.html" id="navAccounts" class="flex items-center gap-3 hover:bg-gray-800 p-3 rounded-r-full hidden">
+            <span class="material-icons">group</span>
+            <span class="sidebar-text">Accounts</span>
+          </a>
+          <a href="companies.html" id="navCompanies" class="flex items-center gap-3 hover:bg-gray-800 p-3 rounded-r-full hidden">
+            <span class="material-icons">apartment</span>
+            <span class="sidebar-text">Companies</span>
+          </a>
+          <a href="locks.html" id="navLocks" class="flex items-center gap-3 hover:bg-gray-800 p-3 rounded-r-full hidden">
+            <span class="material-icons">lock</span>
+            <span class="sidebar-text">Locks</span>
+          </a>
+        </nav>
+      </div>
+
+      <div class="border-t border-gray-700">
+        <a id="logoutBtn" class="flex items-center gap-3 hover:bg-gray-800 p-3 cursor-pointer">
+          <span class="material-icons">logout</span> 
+          <span class="sidebar-text">Logout</span>
+        </a>
+        <a href="#" class="flex items-center gap-3 hover:bg-gray-800 p-3">
+          <span class="material-icons">account_circle</span> 
+          <span class="sidebar-text">Account</span>
+        </a>
+        <a href="#" class="flex items-center gap-3 hover:bg-gray-800 p-3">
+          <span class="material-icons">info</span> 
+          <span class="sidebar-text">About</span>
+        </a>
+      </div>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="flex-1" id="dashboard">
+      <!-- Header -->
+      <header class="bg-red-600 text-white flex justify-between items-center px-6 py-4">
+        <div class="flex items-center gap-3">
+          <div>
+            <h1 class="text-2xl font-bold">Welcome back, <span id="secondName"></span></h1>
+            <p class="text-sm text-white/80">Here's an overview of your Lock activities today</p>
+          </div>
+        </div>
+      </header>
+
+      <!-- Dashboard Metrics -->
+      <div class="p-6 grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div class="bg-white p-4 rounded-xl shadow text-center">
+          <h3 class="text-sm text-gray-500">Total Locks</h3>
+          <p class="text-2xl font-bold" id="totalLocks">0</p>
+        </div>
+        <div class="bg-white p-4 rounded-xl shadow text-center">
+          <h3 class="text-sm text-gray-500">Locks In Progress</h3>
+          <p class="text-2xl font-bold" id="locksInProgress">0</p>
+        </div>
+        <div class="bg-white p-4 rounded-xl shadow text-center">
+          <h3 class="text-sm text-gray-500">Completed Locks</h3>
+          <p class="text-2xl font-bold" id="locksCompleted">0</p>
+        </div>
+        <div class="bg-white p-4 rounded-xl shadow text-center">
+          <h3 class="text-sm text-gray-500">Pending Remarks</h3>
+          <p class="text-2xl font-bold" id="pendingRemarks">0</p>
+        </div>
+      </div>
+
+      <!-- Main Content -->
+      <div class="p-6 grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <!-- Left side (67%) -->
+        <div class="lg:col-span-2 space-y-6">
+          <!-- Lock Transactions -->
+          <div class="bg-white rounded-xl shadow p-4 border border-black">
+            <div class="flex justify-between items-center mb-3">
+              <h2 class="font-semibold text-lg">Lock Transactions</h2>
+              <a href="#" class="text-sm text-blue-500 hover:underline">See Details</a>
+            </div>
+            <div class="space-y-3 lock-transactions">
+              <!-- Transactions will be dynamically inserted here -->
+            </div>
+          </div>
+        </div>
+
+        <!-- Right side (33%) -->
+        <div class="space-y-6">
+          <!-- Next Preventive Maintenance -->
+          <div class="bg-white rounded-xl shadow p-4 border border-black text-center">
+            <h3 class="font-semibold">Next Preventive Maintenance</h3>
+            <p class="text-2xl font-bold" id="nextNpm">N/A</p>
+            <button id="nextNpmBtn" class="mt-2 bg-red-600 text-white px-3 pb-1 rounded-full">→</button>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+<script type="module" src="./indexScript/main.js"></script>
+</body>
+</html>
