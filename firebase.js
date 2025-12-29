@@ -7,8 +7,12 @@ import {
   where,
   orderBy,
   onSnapshot,
-  getDocs
+  getDocs,
 } from "https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js";
+
+import {
+  getAuth
+} from "https://www.gstatic.com/firebasejs/12.4.0/firebase-auth.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyAwRghRtY33jX4HlFUSeEhsLoK92GFSa60",
@@ -21,7 +25,19 @@ const firebaseConfig = {
 };
 
 const app = initializeApp(firebaseConfig);
-const db = getFirestore(app);
 
-// Export Firestore and helper functions
-export { db, collection, query, where, orderBy, onSnapshot, getDocs };
+// Initialize services
+const db = getFirestore(app);
+const auth = getAuth(app);
+
+// Export Firestore + Auth
+export {
+  db,
+  auth,
+  collection,
+  query,
+  where,
+  orderBy,
+  onSnapshot,
+  getDocs
+};

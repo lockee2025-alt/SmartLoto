@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Notifications - Rimberio</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+
+  <style>
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(8px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .animate-fadeIn {
+      animation: fadeIn 0.3s ease-in-out;
+    }
+  </style>
+</head>
+<body class="bg-gray-100 font-sans">
+  <div class="flex min-h-screen">
+
+    <!-- Sidebar -->
+    <aside id="sidebar" class="w-64 bg-gray-900 text-white flex flex-col justify-between transition-all duration-300">
+      <div>
+        <div class="flex items-center gap-3 p-2 border-b border-gray-700">
+            <button id="toggleSidebar" class="bg-white/20 hover:bg-white/30 p-2 rounded-md focus:outline-none">
+                <span class="material-icons [line-height:unset!important]">menu</span>
+            </button>
+          <div class="sidebar-text">
+            <h2 class="font-semibold text-lg" id="name"></h2>
+            <p class="text-sm text-gray-400" id="position"></p>
+          </div>
+        </div>
+
+        <nav class="mt-6 space-y-1">
+          <a href="dashboard.html" class="flex items-center gap-3 hover:bg-gray-800 p-3 rounded-r-full">
+            <span class="material-icons">dashboard</span> 
+            <span class="sidebar-text">Dashboard</span>
+          </a>
+          <a href="Notification.html" class="flex items-center gap-3 hover:bg-gray-800 p-3 rounded-r-full">
+            <span class="material-icons">notifications</span> 
+            <span class="sidebar-text">Notification</span>
+          </a>
+          <a href="Sequence.html" class="flex items-center gap-3 hover:bg-gray-800 p-3 rounded-r-full">
+            <span class="material-icons">computer</span> 
+            <span class="sidebar-text">Sequence</span>
+          </a>
+          <a href="registration.html" id="navAccounts" class="flex items-center gap-3 hover:bg-gray-800 p-3 rounded-r-full hidden">
+            <span class="material-icons">group</span>
+            <span class="sidebar-text">Accounts</span>
+          </a>
+          <a href="companies.html" id="navCompanies" class="flex items-center gap-3 hover:bg-gray-800 p-3 rounded-r-full hidden">
+            <span class="material-icons">apartment</span>
+            <span class="sidebar-text">Companies</span>
+          </a>
+          <a href="locks.html" id="navLocks" class="flex items-center gap-3 hover:bg-gray-800 p-3 rounded-r-full hidden">
+            <span class="material-icons">lock</span>
+            <span class="sidebar-text">Locks</span>
+          </a>
+        </nav>
+      </div>
+
+      <div class="border-t border-gray-700">
+        <a id="logoutBtn" class="flex items-center gap-3 hover:bg-gray-800 p-3 cursor-pointer">
+          <span class="material-icons">logout</span> 
+          <span class="sidebar-text">Logout</span>
+        </a>
+        <a href="account.html" class="flex items-center gap-3 hover:bg-gray-800 p-3">
+          <span class="material-icons">account_circle</span> 
+          <span class="sidebar-text">Account</span>
+        </a>
+        <a href="about.html" class="flex items-center gap-3 bg-red-600 p-3">
+          <span class="material-icons">info</span> 
+          <span class="sidebar-text">About</span>
+        </a>
+      </div>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="flex-1 max-w-[85%] md:max-w-none" id="dashboard">
+      <!-- Header -->
+      <header class="bg-red-600 text-white flex justify-between items-center px-6 py-4">
+        <div>
+          <h1 class="text-2xl font-bold">About Us</h1>
+        </div>
+      </header>
+
+      <!-- About Us -->
+      <section class="p-4 md:p-8">
+  <div class="bg-white rounded-xl shadow-sm p-6 md:p-10 max-w-5xl mx-auto space-y-10 h-[400px] md:h-[85vh] overflow-y-auto pr-2 scrollbar-thin scroll-smooth">
+
+    <!-- About Us -->
+    <div>
+      <h2 class="text-xl md:text-2xl font-semibold text-gray-900 mb-4">
+        About the Smart LOTO System
+      </h2>
+      <div class="space-y-4 text-sm md:text-base text-gray-700 leading-relaxed">
+        <p>
+          Lockout/Tagout (LOTO) is a critical safety control designed to isolate hazardous energy during maintenance and servicing activities, preventing accidental energization of equipment. Traditional LOTO implementations rely heavily on manual procedures, physical locks, and paper-based documentation. While effective when strictly followed, these methods often lack real-time visibility, traceability, and centralized oversight, increasing the risk of human error and unauthorized access.
+        </p>
+        <p>
+          The Smart LOTO System modernizes this process by incorporating electronic locking mechanisms, biometric authentication, integrated sensors, and centralized digital logging. Access to equipment is restricted exclusively to authorized personnel, while all actions are automatically recorded and auditable. Through integration with the Building Management System (BMS), Smart LOTO provides real-time operational status, enhanced incident response, and improved regulatory compliance—transitioning energy control from manual enforcement to data-driven safety management.
+        </p>
+      </div>
+    </div>
+
+    <!-- Divider -->
+    <div class="border-t border-gray-200"></div>
+    <!-- Terms and Policies -->
+    <div>
+      <h2 class="text-xl md:text-2xl font-semibold text-gray-900 mb-6">
+        Terms and Policies
+      </h2>
+
+      <div class="space-y-6 text-sm md:text-base text-gray-700 leading-relaxed">
+
+        <div>
+          <h3 class="font-semibold text-gray-900 mb-1">1. Purpose</h3>
+          <p>
+            These terms define the appropriate use, responsibilities, and governance of the Smart LOTO System integrated with the Building Management System (BMS). The system is intended to enhance workplace safety, accountability, and visibility during lockout/tagout operations.
+          </p>
+        </div>
+
+        <div>
+          <h3 class="font-semibold text-gray-900 mb-1">2. User Responsibilities</h3>
+          <p>
+            Users must operate the system solely for authorized maintenance and safety activities. All access credentials and biometric data must be safeguarded. Any system irregularities, errors, or suspected unauthorized access must be reported immediately. Tampering or unauthorized modification of hardware or software is strictly prohibited.
+          </p>
+        </div>
+
+        <div>
+          <h3 class="font-semibold text-gray-900 mb-1">3. Administrator Responsibilities</h3>
+          <p>
+            Administrators are responsible for user access management, system configuration, data integrity, and routine inspection of all hardware and software components to ensure continuous and reliable operation.
+          </p>
+        </div>
+
+        <div>
+          <h3 class="font-semibold text-gray-900 mb-1">4. Data Privacy and Security</h3>
+          <p>
+            All collected data, including biometric identifiers and activity logs, is used exclusively for identification, monitoring, and audit purposes. Data processing and storage comply with the Data Privacy Act of 2012 (R.A. 10173) and applicable institutional privacy standards. Appropriate technical and administrative safeguards are implemented to prevent unauthorized access.
+          </p>
+        </div>
+
+        <div>
+          <h3 class="font-semibold text-gray-900 mb-1">5. Hardware and Safety Policy</h3>
+          <p>
+            System hardware may only be installed, handled, or serviced by authorized personnel. Devices must be operated within specified environmental and electrical limits. Power sources must be disconnected prior to installation or maintenance activities.
+          </p>
+        </div>
+
+        <div>
+          <h3 class="font-semibold text-gray-900 mb-1">6. System Connectivity and Availability</h3>
+          <p>
+            Continuous Wi-Fi connectivity is required for real-time monitoring, data transmission, and activity logging. The Smart LOTO System does not support offline operation. Temporary network disruptions may limit access to real-time data and logs.
+          </p>
+        </div>
+
+        <div>
+          <h3 class="font-semibold text-gray-900 mb-1">7. Emergency Override Policy</h3>
+          <p>
+            A mechanical emergency override is provided exclusively for authorized administrators in the event of system failure or biometric authentication issues. All override actions are logged and subject to formal administrative review.
+          </p>
+        </div>
+
+        <div>
+          <h3 class="font-semibold text-gray-900 mb-1">8. Limitations and Liability</h3>
+          <p>
+            The Smart LOTO System is a prototype developed for academic and evaluation purposes. While it has undergone functional and reliability testing, it is not certified for large-scale industrial deployment. The developers and affiliated institution disclaim liability for damages or losses resulting from misuse, unauthorized operation, or improper application of the system.
+          </p>
+        </div>
+
+        <div>
+          <h3 class="font-semibold text-gray-900 mb-1">9. Policy Updates and Compliance</h3>
+          <p>
+            These terms and policies may be revised to reflect system enhancements or regulatory updates. All users and administrators are required to comply with the most current approved version. Continued use of the Smart LOTO System constitutes acceptance of these terms and policies.
+          </p>
+        </div>
+
+      </div>
+    </div>
+
+  </div>
+</section>
+
+    </main>
+  </div>
+  <script>
+    const toggleButton = document.getElementById("toggleSidebar");
+    const sidebar = document.getElementById("sidebar");
+    const textElements = document.querySelectorAll(".sidebar-text");
+    const dashboard = document.getElementById("dashboard");
+  
+    // Collapse sidebar by default on mobile
+    if (window.innerWidth < 1024) {
+      sidebar.classList.remove("w-64");
+      sidebar.classList.add("w-14");
+      textElements.forEach(el => el.classList.add("hidden"));
+    }
+  
+    toggleButton.addEventListener("click", () => {
+      if (window.innerWidth < 1024) {
+        // MOBILE: toggle full-screen sidebar
+        sidebar.classList.toggle("fixed");
+        sidebar.classList.toggle("inset-0");
+        sidebar.classList.toggle("!w-full");
+        sidebar.classList.toggle("z-50");
+        dashboard.classList.toggle("hidden");
+  
+        // toggle text visibility
+        textElements.forEach(el => {
+          el.classList.toggle("hidden");
+        });
+      } else {
+        // DESKTOP: toggle between wide and collapsed
+        sidebar.classList.toggle("w-64");
+        sidebar.classList.toggle("w-14");
+        textElements.forEach(el => {
+          el.classList.toggle("hidden");
+        });
+      }
+    });
+  </script>
+
+  <script type="module">
+    import { db } from "./firebase.js";
+    const loggedInUser = JSON.parse(localStorage.getItem("user"));
+    const name = document.getElementById("name");
+    const position = document.getElementById("position");
+
+    if (!loggedInUser) {
+      window.location.href = "index.html";
+    } else {
+      name.innerHTML = loggedInUser.fullName || "N/A";
+      position.innerHTML = loggedInUser.role || "N/A";
+    }
+
+      const logoutBtn = document.getElementById("logoutBtn");
+      logoutBtn.onclick = () => {
+        localStorage.removeItem("user");
+        window.location.href = "index.html";
+      };
+
+      const restrictedRoles = ["super_admin", "company_admin"];
+  if (loggedInUser.role == "super_admin" || loggedInUser.role == "company_admin") {
+  document.getElementById("navAccounts").classList.remove("hidden");
+  document.getElementById("navCompanies").classList.remove("hidden");
+  document.getElementById("navLocks").classList.remove("hidden");
+  }
+  console.log(loggedInUser.role);
+  </script>
+</body>
+</html>

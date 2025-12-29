@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Smartlock LoTo Dashboard</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Material Icons -->
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+</head>
+<body class="bg-gray-100 font-sans">
+
+  <div class="flex min-h-screen">
+
+    <!-- Sidebar -->
+    <aside id="sidebar" class="w-64 bg-gray-900 text-white flex flex-col justify-between transition-all duration-300">
+      <div>
+        <div class="flex items-center gap-3 p-2 border-b border-gray-700">
+            <button id="toggleSidebar" class="bg-white/20 hover:bg-white/30 p-2 rounded-md focus:outline-none">
+                <span class="material-icons [line-height:unset!important]">menu</span>
+            </button>
+          <div class="sidebar-text">
+            <h2 class="font-semibold text-lg" id="name"></h2>
+            <p class="text-sm text-gray-400" id="position"></p>
+          </div>
+        </div>
+
+        <nav class="mt-6 space-y-1">
+          <a href="dashboard.html" class="flex items-center gap-3 hover:bg-gray-800 p-3 rounded-r-full">
+            <span class="material-icons">dashboard</span> 
+            <span class="sidebar-text">Dashboard</span>
+          </a>
+          <a href="Notification.html" class="flex items-center gap-3 hover:bg-gray-800 p-3 rounded-r-full">
+            <span class="material-icons">notifications</span> 
+            <span class="sidebar-text">Notification</span>
+          </a>
+          <a href="Sequence.html" class="flex items-center gap-3 hover:bg-gray-800 p-3 rounded-r-full">
+            <span class="material-icons">computer</span> 
+            <span class="sidebar-text">Sequence</span>
+          </a>
+          <a href="registration.html" id="navAccounts" class="flex items-center gap-3 hover:bg-gray-800 p-3 rounded-r-full hidden">
+            <span class="material-icons">group</span>
+            <span class="sidebar-text">Accounts</span>
+          </a>
+          <a href="companies.html" id="navCompanies" class="flex items-center gap-3 hover:bg-gray-800 p-3 rounded-r-full hidden">
+            <span class="material-icons">apartment</span>
+            <span class="sidebar-text">Companies</span>
+          </a>
+          <a href="locks.html" id="navLocks" class="flex items-center gap-3 hover:bg-gray-800 p-3 rounded-r-full hidden">
+            <span class="material-icons">lock</span>
+            <span class="sidebar-text">Locks</span>
+          </a>
+        </nav>
+      </div>
+
+      <div class="border-t border-gray-700">
+        <a id="logoutBtn" class="flex items-center gap-3 hover:bg-gray-800 p-3 cursor-pointer">
+          <span class="material-icons">logout</span> 
+          <span class="sidebar-text">Logout</span>
+        </a>
+        <a href="account.html" class="flex items-center gap-3 bg-red-600 p-3">
+          <span class="material-icons">account_circle</span> 
+          <span class="sidebar-text">Account</span>
+        </a>
+        <a href="about.html" class="flex items-center gap-3 hover:bg-gray-800 p-3">
+          <span class="material-icons">info</span> 
+          <span class="sidebar-text">About</span>
+        </a>
+      </div>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="flex-1" id="dashboard">
+      <!-- Header -->
+      <header class="bg-red-600 text-white flex justify-between items-center px-6 py-4">
+        <div class="flex items-center gap-3">
+          <div>
+            <h1 class="text-2xl font-bold">Welcome back, <span id="secondName"></span></h1>
+            <p class="text-sm text-white/80">Here's an overview of your Lock activities today</p>
+          </div>
+        </div>
+      </header>
+
+      <!-- Dashboard Metrics -->
+        <section class="p-0 md:p-6">
+            <div class="bg-white rounded-xl shadow p-4">
+            <div class="max-w-xl mx-auto bg-white p-6 rounded-xl shadow">
+                <h2 class="text-xl font-semibold mb-6">My Account</h2>
+
+                    <form id="accountForm" class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium">Full Name</label>
+                        <input id="fullName" type="text" class="w-full mt-1 p-2 border rounded">
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-medium">Username</label>
+                        <input id="email" type="text" class="w-full mt-1 p-2 border rounded">
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-medium">Password</label>
+                        <input id="password" type="password" class="w-full mt-1 p-2 border rounded">
+                    </div>
+
+                    <div>
+                    <label class="block text-sm font-medium">Company</label>
+                    <p id="companyName" class="w-full mt-1 p-2 border rounded bg-gray-100"></p>
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-medium">Role</label>
+                    <p id="role" class="w-full mt-1 p-2 border rounded bg-gray-100" readonly>
+                    </div>
+
+                    <button type="submit" class="w-full bg-blue-600 text-white py-2 rounded hover:bg-blue-700 transition">
+                        Save Changes
+                    </button>
+                    </form>
+
+
+                </div>
+
+            </div>
+        </section>
+
+    </main>
+  </div>
+
+  <script type="module">
+import { db } from "./firebase.js";
+import { doc, getDoc, updateDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js";
+
+const user = JSON.parse(localStorage.getItem("user"));
+const userRef = doc(db, "users", user.id);
+const companyNameEl = document.getElementById("companyName");
+
+// 1️⃣ Get user data
+const snap = await getDoc(userRef);
+if (snap.exists()) {
+  const data = snap.data();
+  fullName.value = data.fullName || "";
+  email.value = data.username || "";
+  password.value = data.password || "";
+  role.value = data.role || "";
+
+  const roleP = document.getElementById("role");
+  roleP.textContent = data.role || "N/A";
+  // 2️⃣ Get company data
+  if (data.companyID) {
+    const companyRef = doc(db, "companies", data.companyID);
+    const companySnap = await getDoc(companyRef);
+    if (companySnap.exists()) {
+      const companyData = companySnap.data();
+      companyNameEl.textContent = companyData.name || "N/A";
+    } else {
+      companyNameEl.textContent = "Company not found";
+    }
+  } else {
+    companyNameEl.textContent = "No company assigned";
+  }
+}
+
+// Handle form submission
+accountForm.addEventListener("submit", async (e) => {
+  e.preventDefault();
+
+  await updateDoc(userRef, {
+    fullName: fullName.value,
+    username: email.value,
+    password: password.value,
+    updatedAt: serverTimestamp()
+  });
+
+  alert("Profile updated successfully!");
+});
+
+
+</script>
+
+  <script>
+    const toggleButton = document.getElementById("toggleSidebar");
+    const sidebar = document.getElementById("sidebar");
+    const textElements = document.querySelectorAll(".sidebar-text");
+    const dashboard = document.getElementById("dashboard");
+  
+    // Collapse sidebar by default on mobile
+    if (window.innerWidth < 1024) {
+      sidebar.classList.remove("w-64");
+      sidebar.classList.add("w-14");
+      textElements.forEach(el => el.classList.add("hidden"));
+    }
+  
+    toggleButton.addEventListener("click", () => {
+      if (window.innerWidth < 1024) {
+        // MOBILE: toggle full-screen sidebar
+        sidebar.classList.toggle("fixed");
+        sidebar.classList.toggle("inset-0");
+        sidebar.classList.toggle("!w-full");
+        sidebar.classList.toggle("z-50");
+        dashboard.classList.toggle("hidden");
+  
+        // toggle text visibility
+        textElements.forEach(el => {
+          el.classList.toggle("hidden");
+        });
+      } else {
+        // DESKTOP: toggle between wide and collapsed
+        sidebar.classList.toggle("w-64");
+        sidebar.classList.toggle("w-14");
+        textElements.forEach(el => {
+          el.classList.toggle("hidden");
+        });
+      }
+    });
+  </script>
+
+  <script type="module">
+    import { db } from "./firebase.js";
+    const loggedInUser = JSON.parse(localStorage.getItem("user"));
+    const name = document.getElementById("name");
+    const position = document.getElementById("position");
+
+    if (!loggedInUser) {
+      window.location.href = "index.html";
+    } else {
+      name.innerHTML = loggedInUser.fullName || "N/A";
+      position.innerHTML = loggedInUser.role || "N/A";
+    }
+
+      const logoutBtn = document.getElementById("logoutBtn");
+      logoutBtn.onclick = () => {
+        localStorage.removeItem("user");
+        window.location.href = "index.html";
+      };
+
+      const restrictedRoles = ["super_admin", "company_admin"];
+  if (loggedInUser.role == "super_admin" || loggedInUser.role == "company_admin") {
+  document.getElementById("navAccounts").classList.remove("hidden");
+  document.getElementById("navCompanies").classList.remove("hidden");
+  document.getElementById("navLocks").classList.remove("hidden");
+  }
+  console.log(loggedInUser.role);
+  </script>
+</body>
+</html>
