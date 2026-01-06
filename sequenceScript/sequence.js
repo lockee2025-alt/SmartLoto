@@ -54,7 +54,7 @@ export function initSequenceTable(loggedInUser) {
     snapshot.docs.forEach(docSnap => {
       const lock = docSnap.data();
       const assignedRoles = (lock.assignedRoles || []).sort((a, b) => a.sequence - b.sequence);
-      const sequenceStep = lock.sequenceStep || 1;
+      const sequenceStep = Number(lock.sequenceStep) || 1;
 
       // Lock Header
       const headerRow = document.createElement("tr");
@@ -70,13 +70,13 @@ export function initSequenceTable(loggedInUser) {
         let status = "Pending";
         let statusClass = "bg-gray-100 text-gray-600";
         let nextStep = "";
-
         if (roleObj.sequence < sequenceStep) {
           status = "Done"; statusClass = "bg-green-100 text-green-800";
           nextStep = assignedRoles[index + 1] ? `${assignedRoles[index+1].roleID} can proceed` : "All steps completed";
         } else if (roleObj.sequence === sequenceStep) {
-          status = "In Progress"; statusClass = "bg-yellow-100 text-yellow-800";
-          nextStep = assignedRoles[index + 1] ? `Waiting for ${assignedRoles[index+1].roleID}` : "Final step in progress";
+          status = "In Progress";
+          statusClass = "bg-yellow-100 text-yellow-800";
+          nextStep = "Action required";
         } else {
           status = "Pending"; statusClass = "bg-gray-100 text-gray-600";
           nextStep = `Waiting for ${assignedRoles.find(r => r.sequence === sequenceStep)?.roleID || "previous role"}`;

@@ -60,54 +60,52 @@ export function loadNotifications(user) {
 
     const fragment = document.createDocumentFragment();
 
-    const tasks = snapshot.docs.map(async (docSnap) => {
-      const log = docSnap.data();
+for (const docSnap of snapshot.docs) {
+  const log = docSnap.data();
 
-      const userName = await getUserName(log.userID);
-      const lockName = await getLockName(log.lockID);
+  const userName = await getUserName(log.userID);
+  const lockName = await getLockName(log.lockID);
 
-      const timestamp = log.timestamp?.toDate
-        ? log.timestamp.toDate()
-        : new Date(log.timestamp);
+  const timestamp = log.timestamp?.toDate
+    ? log.timestamp.toDate()
+    : new Date(log.timestamp);
 
-      const formattedTime = timestamp.toLocaleString("en-PH", {
-        day: "2-digit",
-        month: "short",
-        year: "numeric",
-        hour: "2-digit",
-        minute: "2-digit",
-        hour12: true,
-      });
+  const formattedTime = timestamp.toLocaleString("en-PH", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: true,
+  });
 
-      const actionColor =
-        log.action === "unlock"
-          ? "bg-green-100 text-green-800"
-          : log.action === "lock"
-          ? "bg-red-100 text-red-800"
-          : "bg-gray-100 text-gray-700";
+  const actionColor =
+    log.action === "unlock"
+      ? "bg-green-100 text-green-800"
+      : log.action === "lock"
+      ? "bg-red-100 text-red-800"
+      : "bg-gray-100 text-gray-700";
 
-      const wrapper = document.createElement("div");
-      wrapper.className =
-        "bg-gray-50 border border-gray-200 rounded-lg p-4 flex justify-between items-center shadow-sm animate-fadeIn";
+  const wrapper = document.createElement("div");
+  wrapper.className =
+    "bg-gray-50 border border-gray-200 rounded-lg p-4 flex justify-between items-center shadow-sm animate-fadeIn";
 
-      wrapper.innerHTML = `
-        <div>
-          <p class="text-gray-800 font-medium">${userName}</p>
-          <p class="text-gray-600 text-sm">
-            performed <span class="font-semibold">${log.action}</span> on 
-            <span class="font-semibold">${lockName}</span>
-          </p>
-          <p class="text-xs text-gray-400 mt-1">${formattedTime}</p>
-        </div>
-        <span class="text-xs ${actionColor} px-3 py-1 rounded-full capitalize">
-          ${log.result || "N/A"}
-        </span>
-      `;
+  wrapper.innerHTML = `
+    <div>
+      <p class="text-gray-800 font-medium">${userName}</p>
+      <p class="text-gray-600 text-sm">
+        performed <span class="font-semibold">${log.action}</span> on 
+        <span class="font-semibold">${lockName}</span>
+      </p>
+      <p class="text-xs text-gray-400 mt-1">${formattedTime}</p>
+    </div>
+    <span class="text-xs ${actionColor} px-3 py-1 rounded-full capitalize">
+      ${log.result || "N/A"}
+    </span>
+  `;
 
-      fragment.appendChild(wrapper);
-    });
-
-    await Promise.all(tasks);
-    container.appendChild(fragment);
+  fragment.appendChild(wrapper);
+}
+container.appendChild(fragment);
   });
 }

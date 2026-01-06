@@ -29,7 +29,7 @@ export function setupLocks(loggedInUser, el) {
 
     locks.slice(-5).reverse().forEach(l => {
       const totalSteps = l.assignedRoles?.length || 0;
-      const computedStatus = Number(l.sequenceStep) === 0 || Number(l.sequenceStep) > totalSteps ? "Completed" : "In Progress";
+      const computedStatus = Number(l.sequenceStep) === 0 || Number(l.sequenceStep) === totalSteps ? "Completed" : "In Progress";
       const realStatus = l.status ?? "Unknown";
 
       const div = document.createElement("div");
